@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lucky Lounge</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --felt:#0f2a26; --felt-2:#16403a; --ink:#091816; --ivory:#f3ead3; --muted:#8fa8a0;
+  --brass:#d6a84f; --ruby:#c8403f; --win:#7bd88f;
+  --r-lg:22px; --r-md:14px; --r-pill:999px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--ink);color:var(--ivory);
+  font-family:"Sora","Segoe UI",system-ui,-apple-system,sans-serif}
+body{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.app{max-width:480px;margin:0 auto;padding:16px 16px 120px;display:flex;flex-direction:column;gap:16px}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+button:disabled{opacity:.5;cursor:not-allowed}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.who{font-size:14px;color:var(--muted)}
+.who b{display:block;color:var(--ivory);font-size:16px;font-weight:600}
+.bank{background:var(--felt);border:1px solid #24544c;border-radius:var(--r-pill);padding:8px 16px;text-align:right}
+.bank small{display:block;font-size:11px;color:var(--muted)}
+.bank strong{font-size:20px;font-variant-numeric:tabular-nums;color:var(--brass)}
+.bank.up strong{animation:pop .5s}
+@keyframes pop{40%{transform:scale(1.18);color:var(--win)}}
+
+/* tabs */
+.tabs{display:flex;gap:4px;background:var(--felt);padding:4px;border-radius:var(--r-pill)}
+.tabs button{flex:1;padding:10px 0;background:none;border-radius:var(--r-pill);color:var(--muted);font-weight:600;font-size:14px}
+.tabs button[aria-selected=true]{background:var(--brass);color:#2a1d05}
+
+/* table */
+.table{background:radial-gradient(120% 90% at 50% 0%,var(--felt-2),var(--felt));border:1px solid #24544c;
+  border-radius:var(--r-lg);padding:22px 16px;min-height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.game{display:none;width:100%;flex-direction:column;align-items:center;gap:18px}
+.game.on{display:flex}
+.msg{min-height:24px;font-weight:600;text-align:center;color:var(--muted)}
+.msg.win{color:var(--win)} .msg.lose{color:var(--ruby)}
+
+/* slots */
+.reels{display:flex;gap:10px}
+.reel{width:84px;height:104px;background:var(--ivory);border-radius:var(--r-md);display:grid;place-items:center;
+  font-size:48px;box-shadow:inset 0 6px 12px #0003,0 0 0 3px var(--brass)}
+.reel.spin{filter:blur(1.5px)}
+.paytable{font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+
+.reel svg{width:58px;height:58px}
+#g-vault .reel{background:#1b1233;box-shadow:inset 0 6px 12px #0006,0 0 0 3px #8e6bff}
+.tile i svg{width:38px;height:38px;display:block}
+/* coin */
+.coin-wrap{perspective:600px}
+.coin{width:110px;height:110px;position:relative;transform-style:preserve-3d;transition:transform 1.2s cubic-bezier(.2,.7,.2,1)}
+.coin div{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;font-size:44px;font-weight:700;
+  backface-visibility:hidden;background:var(--brass);color:#2a1d05;box-shadow:inset 0 0 0 6px #ffffff33,0 6px 16px #0006}
+.coin .t{transform:rotateY(180deg);background:#b98a36}
+
+/* roulette */
+.ball{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;font-size:44px;font-weight:700;
+  background:#222;box-shadow:0 0 0 5px var(--brass);transition:background .2s}
+.ball.red{background:var(--ruby)} .ball.black{background:#1a1a1a} .ball.green{background:#2f8f5b}
+
+/* choices */
+.choices{display:flex;gap:8px;width:100%}
+.choices button{flex:1;padding:12px 0;border-radius:var(--r-md);background:#ffffff12;font-weight:600;border:2px solid transparent}
+.choices button[aria-pressed=true]{border-color:var(--brass);background:#d6a84f22}
+.choices .c-red{color:#ff8a87}.choices .c-green{color:var(--win)}
+
+/* bet */
+.bet{display:flex;flex-direction:column;gap:12px}
+.bet-label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.chips{display:flex;gap:8px}
+.chips button{flex:1;padding:11px 0;border-radius:var(--r-pill);background:var(--felt);border:1px solid #24544c;font-weight:600;font-variant-numeric:tabular-nums}
+.chips button[aria-pressed=true]{background:var(--ivory);color:var(--ink);border-color:var(--ivory)}
+.play{padding:16px;border-radius:var(--r-pill);background:var(--brass);color:#2a1d05;font-weight:700;font-size:17px}
+.play:active{transform:scale(.98)}
+
+/* footer */
+.foot{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.bonus{padding:9px 16px;border-radius:var(--r-pill);background:none;border:1px solid var(--brass);color:var(--brass);font-weight:600}
+.hist{display:flex;gap:6px;flex-wrap:wrap}
+.hist span{padding:3px 9px;border-radius:var(--r-pill);font-size:12px;background:#ffffff12;font-variant-numeric:tabular-nums}
+.hist .w{color:var(--win)} .hist .l{color:#ff8a87}
+.note{font-size:11px;color:var(--muted);text-align:center}
+
+/* views */
+.view{display:none;flex-direction:column;gap:16px}
+.view.on{display:flex}
+h2{margin:4px 0 0;font-size:22px;font-weight:700}
+.card{background:var(--felt);border:1px solid #24544c;border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:10px}
+.card p{margin:0;font-size:13px;color:var(--muted);line-height:1.5}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bonus{padding:9px 18px;border-radius:var(--r-pill);background:none;border:1px solid var(--brass);color:var(--brass);font-weight:600}
+.bonus:disabled{border-color:#ffffff33;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{background:radial-gradient(120% 90% at 50% 0%,var(--felt-2),var(--felt));border:1px solid #24544c;border-radius:var(--r-lg);
+  padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tile i{font-style:normal;font-size:34px}.tile b{font-size:14px}.tile small{font-size:11px;color:var(--muted)}
+.packs{display:grid;grid-template-columns:1fr;gap:10px}
+.pack{display:flex;justify-content:space-between;align-items:center;padding:16px;border-radius:var(--r-lg);background:var(--felt);border:1px solid #24544c;font-weight:600}
+.pack span{color:var(--brass);font-variant-numeric:tabular-nums;font-size:18px}
+.pack small{color:var(--muted);font-weight:500}
+.sw{width:48px;height:28px;border-radius:var(--r-pill);background:#ffffff22;position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--ivory);transition:transform .2s}
+.sw[aria-checked=true]{background:var(--brass)}.sw[aria-checked=true]::after{transform:translateX(20px)}
+.danger{padding:12px;border-radius:var(--r-pill);background:none;border:1px solid #c8403f88;color:#ff8a87;font-weight:600}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.list li{display:flex;justify-content:space-between;padding:12px 16px;border-radius:var(--r-md);background:var(--felt);font-size:14px}
+.list .w{color:var(--win)}.list .l{color:#ff8a87}.empty{color:var(--muted);font-size:13px;font-style:normal}
+/* bottom bar */
+.bar{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:480px;z-index:5;
+  display:grid;grid-template-columns:repeat(5,1fr);align-items:end;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));
+  background:var(--felt);border-top:1px solid #24544c}
+.bar button{background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;color:var(--muted);font-size:11px;font-weight:600}
+.bar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bar button[aria-current=page]{color:var(--brass)}
+.bar .mid{color:#2a1d05}
+.bar .mid .puck{width:60px;height:60px;border-radius:50%;background:var(--brass);display:grid;place-items:center;margin-top:-30px;
+  box-shadow:0 0 0 5px var(--felt),0 6px 16px #0008}
+.bar .mid svg{fill:#2a1d05;stroke:#2a1d05;width:26px;height:26px}
+.bar .mid span{color:var(--muted)}.bar .mid[aria-current=page] span{color:var(--brass)}
+/* gate, toast, deposit form */
+.gate{position:fixed;inset:0;z-index:30;background:var(--ink);display:none;place-items:center;text-align:center;padding:32px}
+.gate.on{display:grid}
+.gate p{color:var(--muted);line-height:1.6;margin:8px 0 18px}
+.gate button{padding:12px 28px;border-radius:var(--r-pill);background:var(--brass);color:#2a1d05;font-weight:700}
+.toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);max-width:min(440px,90vw);
+  background:var(--ivory);color:var(--ink);padding:12px 18px;border-radius:var(--r-md);font-size:14px;font-weight:600;opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s;z-index:25;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.amt{display:flex;gap:8px;align-items:center}
+.amt .cur{color:var(--brass);font-weight:700;font-size:20px}
+.amt input{flex:1;min-width:0;padding:14px 16px;border-radius:var(--r-md);border:1px solid #24544c;background:var(--felt);color:var(--ivory);font:inherit;font-size:16px}
+.amt input:focus-visible{outline:2px solid var(--brass)}
+.amt button{padding:14px 22px;border-radius:var(--r-pill);background:var(--brass);color:#2a1d05;font-weight:700}
+h3{margin:6px 0 0;font-size:15px;color:var(--muted);font-weight:600}
+.list small{color:var(--muted)}
+/* wallet */
+[hidden]{display:none!important}
+.stack{display:flex;flex-direction:column;gap:14px}
+.seg{display:flex;gap:4px;background:var(--felt);padding:4px;border-radius:var(--r-pill)}
+.seg button{flex:1;padding:10px 0;background:none;border-radius:var(--r-pill);color:var(--muted);font-weight:600}
+.seg button[aria-pressed=true]{background:var(--brass);color:#2a1d05}
+.nets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.net{padding:13px 4px;border-radius:var(--r-md);background:var(--felt);border:2px solid #24544c;font-weight:600;font-size:13px}
+.net[aria-pressed=true]{border-color:var(--brass);background:#d6a84f22}
+.qa{display:flex;gap:8px}.qa button{flex:1;padding:9px 0;border-radius:var(--r-pill);background:#ffffff12;font-weight:600}
+.field{width:100%;padding:14px 16px;border-radius:var(--r-md);border:1px solid #24544c;background:var(--felt);color:var(--ivory);font:inherit;font-size:15px}
+.field:focus-visible{outline:2px solid var(--brass)}
+.paybox .big{font-size:26px;font-weight:700;color:var(--brass);font-variant-numeric:tabular-nums}
+.paybox .addr{word-break:break-all;font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#00000040;padding:10px 12px;border-radius:var(--r-md)}
+.paybox .btns{display:flex;gap:8px}.paybox .btns button{flex:1}
+.warn{color:#ffb4b2!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6d77a"/><stop offset="1" stop-color="#c8902f"/></linearGradient>
+  <linearGradient id="cyan" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ff0ff"/><stop offset="1" stop-color="#1a9bb5"/></linearGradient>
+  <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd36b"/><stop offset="1" stop-color="#ff7a1f"/></linearGradient>
+  <linearGradient id="violet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a2ff"/><stop offset="1" stop-color="#5b3bc4"/></linearGradient>
+  <symbol id="s-crown" viewBox="0 0 64 64"><path d="M8 48L4 20l16 12 12-20 12 20 16-12-4 28z" fill="url(#gold)" stroke="#7a5412" stroke-width="2" stroke-linejoin="round"/><rect x="8" y="50" width="48" height="7" rx="2" fill="#b98a36" stroke="#7a5412" stroke-width="2"/><circle cx="32" cy="11" r="3.5" fill="#ff5c5c"/><circle cx="4" cy="20" r="3" fill="#6fe3ff"/><circle cx="60" cy="20" r="3" fill="#6fe3ff"/></symbol>
+  <symbol id="s-gem" viewBox="0 0 64 64"><path d="M16 10h32l12 16-28 30L4 26z" fill="url(#cyan)" stroke="#0b5563" stroke-width="2" stroke-linejoin="round"/><path d="M4 26h56M22 10l-6 16 16 30 16-30-6-16" fill="none" stroke="#ffffffaa" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="s-bolt" viewBox="0 0 64 64"><path d="M36 4L10 36h18l-4 24 30-35H35z" fill="url(#amber)" stroke="#8a4b05" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="s-star" viewBox="0 0 64 64"><path d="M32 5l8.5 17.5 19 2.7-13.8 13.4 3.3 19L32 48.7 15 57.6l3.3-19L4.5 25.2l19-2.7z" fill="url(#gold)" stroke="#7a5412" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="s-shield" viewBox="0 0 64 64"><path d="M32 4l22 8v18c0 16-10 26-22 30C20 56 10 46 10 30V12z" fill="url(#violet)" stroke="#3a1f6b" stroke-width="2" stroke-linejoin="round"/><path d="M32 16v34M20 26h24" stroke="#ffffffcc" stroke-width="3" stroke-linecap="round"/></symbol>
+</defs></svg>
+<div class="gate on" id="gate"><div><h2>Lucky Lounge</h2><p id="gateMsg">Loading…</p><button id="gateBtn" hidden>Try again</button></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<main class="app">
+  <header class="top">
+    <div class="who">Welcome back<b id="name">Player</b></div>
+    <div class="bank" id="bank"><small>Balance</small><strong id="balance">$0.00</strong></div>
+  </header>
+
+  <div class="view" id="v-play">
+  <nav class="tabs" role="tablist" aria-label="Games">
+    <button role="tab" aria-selected="true" data-game="slots">Slots</button>
+    <button role="tab" aria-selected="false" data-game="vault">Royal</button>
+    <button role="tab" aria-selected="false" data-game="coin">Coin</button>
+    <button role="tab" aria-selected="false" data-game="roulette">Roulette</button>
+  </nav>
+
+  <section class="table">
+    <div class="game on" id="g-slots">
+      <div class="reels" aria-live="polite">
+        <div class="reel">🍒</div><div class="reel">🍋</div><div class="reel">🔔</div>
+      </div>
+      <div class="paytable">3 of a kind: 🍒 ×7 · 🍋 ×14 · 🔔 ×28 · 💎 ×60 · 7️⃣ ×200</div>
+    </div>
+
+    <div class="game" id="g-vault">
+      <div class="reels" aria-live="polite">
+        <div class="reel"><svg viewBox="0 0 64 64"><use href="#s-crown"/></svg></div>
+        <div class="reel"><svg viewBox="0 0 64 64"><use href="#s-gem"/></svg></div>
+        <div class="reel"><svg viewBox="0 0 64 64"><use href="#s-bolt"/></svg></div>
+      </div>
+      <div class="paytable">3 of a kind: Shield ×6 · Star ×14 · Bolt ×28 · Gem ×70 · Crown ×200</div>
+    </div>
+
+    <div class="game" id="g-coin">
+      <div class="coin-wrap"><div class="coin" id="coin"><div class="h">H</div><div class="t">T</div></div></div>
+      <div class="choices" data-pick="coin">
+        <button aria-pressed="true" data-v="heads">Heads</button>
+        <button aria-pressed="false" data-v="tails">Tails</button>
+      </div>
+      <div class="paytable">Win pays ×2.1</div>
+    </div>
+
+    <div class="game" id="g-roulette">
+      <div class="ball" id="ball">0</div>
+      <div class="choices" data-pick="roulette">
+        <button class="c-red" aria-pressed="true" data-v="red">Red</button>
+        <button aria-pressed="false" data-v="black">Black</button>
+        <button class="c-green" aria-pressed="false" data-v="green">Zero</button>
+      </div>
+      <div class="paytable">Red or black ×2 · 0 or 00 ×14</div>
+    </div>
+
+    <div class="msg" id="msg">Choose a bet and play.</div>
+  </section>
+
+  <section class="bet">
+    <div class="bet-label"><span>Bet</span><span id="betShown">$1.00</span></div>
+    <div class="chips" id="chips">
+      <button aria-pressed="true" data-b="100">$1</button>
+      <button aria-pressed="false" data-b="500">$5</button>
+      <button aria-pressed="false" data-b="1000">$10</button>
+      <button aria-pressed="false" data-b="5000">$50</button>
+      <button aria-pressed="false" data-b="max">Max</button>
+    </div>
+    <button class="play" id="play">Spin</button>
+  </section>
+
+  <p class="note">18+ only. Play responsibly.</p>
+  </div>
+
+  <div class="view on" id="v-home">
+    <h2>Pick a game</h2>
+    <div class="tiles">
+      <button class="tile" data-go="slots"><i>🎰</i><b>Slots</b><small>Up to ×200</small></button>
+      <button class="tile" data-go="vault"><i><svg viewBox="0 0 64 64"><use href="#s-crown"/></svg></i><b>Royal slots</b><small>Up to ×200</small></button>
+      <button class="tile" data-go="coin"><i>🪙</i><b>Coin flip</b><small>×2.1</small></button>
+      <button class="tile" data-go="roulette"><i>🎡</i><b>Roulette</b><small>Up to ×14</small></button>
+    </div>
+    <div class="card"><b>Recent rounds</b><div class="hist" id="hist"><em class="empty">No rounds yet</em></div></div>
+  </div>
+
+  <div class="view" id="v-wallet">
+    <h2>Wallet</h2>
+    <div class="seg" role="group" aria-label="Wallet mode">
+      <button data-wtab="dep" aria-pressed="true">Deposit</button>
+      <button data-wtab="wd" aria-pressed="false">Withdraw</button>
+    </div>
+
+    <div class="stack" id="w-dep">
+      <h3>1. Choose network</h3>
+      <div class="nets" id="depNets"></div>
+      <h3>2. Amount (USD)</h3>
+      <div class="amt"><span class="cur">$</span><input id="amt" type="number" inputmode="decimal" step="0.01" placeholder="Enter amount" aria-label="Deposit amount in dollars"><button id="amtGo">Continue</button></div>
+      <div class="qa"><button data-q="5">$5</button><button data-q="10">$10</button><button data-q="25">$25</button><button data-q="100">$100</button></div>
+      <div class="card paybox" id="payBox" hidden></div>
+      <p class="note" id="depNote" style="text-align:left"></p>
+      <h3>Recent deposits</h3>
+      <ul class="list" id="depList"><li><span class="empty">No deposits yet.</span></li></ul>
+    </div>
+
+    <div class="stack" id="w-wd" hidden>
+      <h3>1. Choose network</h3>
+      <div class="nets" id="wdNets"></div>
+      <h3>2. Your wallet address</h3>
+      <input class="field" id="wdAddr" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your USDT address" aria-label="Wallet address">
+      <h3>3. Amount (USD)</h3>
+      <div class="amt"><span class="cur">$</span><input id="wdAmt" type="number" inputmode="decimal" step="0.01" placeholder="Amount" aria-label="Withdrawal amount in dollars"><button id="wdMax">Max</button></div>
+      <p class="note" id="wdSummary" style="text-align:left"></p>
+      <button class="play" id="wdGo">Request withdrawal</button>
+      <p class="note" id="wdNote" style="text-align:left"></p>
+      <h3>Recent withdrawals</h3>
+      <ul class="list" id="wdList"><li><span class="empty">No withdrawals yet.</span></li></ul>
+    </div>
+  </div>
+
+  <div class="view" id="v-history">
+    <h2>History</h2>
+    <ul class="list" id="histList"><li><span class="empty">No rounds yet. Play a game to see results here.</span></li></ul>
+  </div>
+
+  <div class="view" id="v-settings">
+    <h2>Settings</h2>
+    <div class="card">
+      <div class="row"><div><b>Haptic feedback</b><p>Vibrate on spins and results.</p></div><button class="sw" role="switch" aria-checked="true" id="swHaptic" aria-label="Haptic feedback"></button></div>
+      <div class="row"><div><b>Fast animations</b><p>Shorter spins and flips.</p></div><button class="sw" role="switch" aria-checked="false" id="swFast" aria-label="Fast animations"></button></div>
+    </div>
+    <p class="note">Lucky Lounge</p>
+  </div>
+</main>
+
+<nav class="bar" aria-label="Main">
+  <button data-view="home" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+  <button data-view="wallet" aria-current="false"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg><span>Wallet</span></button>
+  <button data-view="play" class="mid" aria-current="false"><div class="puck"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg></div><span>Play</span></button>
+  <button data-view="history" aria-current="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>History</span></button>
+  <button data-view="settings" aria-current="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Settings</span></button>
+</nav>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#091816"); tg.setBackgroundColor && tg.setBackgroundColor("#091816"); tg.disableVerticalSwipes && tg.disableVerticalSwipes(); }
+const haptic = t => { if (!state.haptics) return; try { tg.HapticFeedback.notificationOccurred(t); } catch(e){} };
+const tap = () => { if (!state.haptics) return; try { tg.HapticFeedback.impactOccurred("light"); } catch(e){} };
+
+/* ---------- state ---------- */
+const state = { balance: 0, game: "slots", bet: 100, pick: { coin: "heads", roulette: "red" }, busy: false, depositing: false, ready: false, haptics: true, fast: false, log: [] };
+const NAMES = { slots: "Slots", vault: "Royal slots", coin: "Coin flip", roulette: "Roulette" };
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const money = c => "$" + (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = c => (c > 0 ? "+" : c < 0 ? "-" : "") + money(Math.abs(c));
+
+/* ---------- API (all amounts are integer cents; the server decides every outcome) ---------- */
+const API = "https://still-breeze-4211.renderhost1.workers.dev";
+const MIN_BET = 100, MAX_BET = 10000;
+const rnd = n => Math.floor(Math.random() * n); // display-only (reel flicker); never used for results
+async function api(path, body) {
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const post = body !== undefined;
+    const res = await fetch(API + path, {
+      method: post ? "POST" : "GET",
+      headers: { Authorization: "tma " + (tg ? tg.initData : ""), ...(post ? { "Content-Type": "application/json" } : {}) },
+      body: post ? JSON.stringify(body) : undefined, signal: ctrl.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.error || "request_failed"), { status: res.status, data });
+    return data;
+  } finally { clearTimeout(timer); }
+}
+const ERR = {
+  insufficient_balance: "Not enough balance.",
+  bad_bet: "Bets must be between $1 and $100.",
+  unauthorized: "Session expired. Close and reopen the app.",
+  bad_amount: "That amount isn't allowed.",
+  bad_network: "Choose a network first.",
+  bad_address: "That wallet address isn't valid for this network.",
+  below_network_min: "This network needs a larger minimum. Try a bigger amount or another network.",
+  rate_limited: "Too many requests. Wait a moment and try again.",
+  provider_error: "Payment provider is unavailable. Try again shortly.",
+};
+const errText = e => {
+  if (e.name === "AbortError") return "The server took too long. Try again.";
+  if (e.message === "turnover_required") return `Wager ${money(e.data.remaining_cents)} more before you can withdraw.`;
+  if (e.message === "bad_amount" && e.data && e.data.min) return `Amount must be between $${e.data.min} and $${e.data.max}.`;
+  return ERR[e.message] || "Something went wrong. Try again.";
+};
+function showGate(msg, retry) { $("#gate").classList.add("on"); $("#gateMsg").textContent = msg; $("#gateBtn").hidden = !retry; }
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 4500); }
+
+/* ---------- UI helpers ---------- */
+function setBalance(v) {
+  $("#balance").textContent = money(v);
+  const b = $("#bank"); b.classList.remove("up"); void b.offsetWidth; b.classList.add("up");
+}
+function say(text, cls = "") { const m = $("#msg"); m.textContent = text; m.className = "msg " + cls; }
+function renderLog() {
+  $("#hist").innerHTML = state.log.slice(0, 6).map(e => `<span class="${e.win ? "w" : "l"}">${e.text}</span>`).join("") || '<em class="empty">No rounds yet</em>';
+  $("#histList").innerHTML = state.log.map(e => `<li><span>${NAMES[e.game] || e.game}</span><b class="${e.win ? "w" : "l"}">${e.text}</b></li>`).join("")
+    || '<li><span class="empty">No rounds yet. Play a game to see results here.</span></li>';
+}
+function addHistory(win, text, game) { state.log.unshift({ win, text, game }); state.log.length = Math.min(state.log.length, 30); renderLog(); }
+const DEP_LABEL = { created: "Started", waiting: "Awaiting payment", confirming: "Confirming", confirmed: "Confirmed", sending: "Processing", partially_paid: "Partially paid, contact support", finished: "Credited", failed: "Failed", refunded: "Refunded", expired: "Expired" };
+function renderDeposits(list) {
+  state.deps = list;
+  $("#depList").innerHTML = list.map(d => {
+    const open = (d.status === "created" || d.status === "waiting") && d.pay_address;
+    return `<li><span>${money(Math.round(d.price_usd * 100))}${netLabel(d.network) ? " · " + esc(netLabel(d.network)) : ""}<br><small>${new Date(d.created_at * 1000).toLocaleDateString()}</small></span>` +
+      (open ? `<button class="bonus" data-pay="${esc(d.order_id)}">Pay details</button>`
+            : `<b class="${d.status === "finished" ? "w" : ""}">${esc(DEP_LABEL[d.status] || d.status)}</b>`) + "</li>";
+  }).join("") || '<li><span class="empty">No deposits yet.</span></li>';
+  if (state.pay) {
+    const cur = list.find(d => d.order_id === state.pay.order_id);
+    if (cur && cur.status === "finished") { $("#payBox").hidden = true; state.pay = null; }
+    else if (cur && $("#payStatus")) $("#payStatus").textContent = "Status: " + (DEP_LABEL[cur.status] || cur.status);
+  }
+}
+const WD_LABEL = { pending: "Pending review", paid: "Paid", rejected: "Rejected, refunded" };
+function renderWithdrawals(list) {
+  $("#wdList").innerHTML = list.map(w => `<li><span>${money(w.amount_cents)} · ${esc(netLabel(w.network))}<br><small>${new Date(w.created_at * 1000).toLocaleDateString()}</small></span><b class="${w.status === "paid" ? "w" : w.status === "rejected" ? "l" : ""}">${esc(WD_LABEL[w.status] || w.status)}</b></li>`).join("")
+    || '<li><span class="empty">No withdrawals yet.</span></li>';
+}
+async function loadMe() {
+  const d = await api("/api/me");
+  state.balance = d.balance; setBalance(d.balance); refreshBet();
+  state.log = d.rounds.map(r => ({ win: r.payout > r.bet, text: signed(r.payout - r.bet), game: r.game }));
+  renderLog(); renderDeposits(d.deposits); renderWithdrawals(d.withdrawals || []);
+  return d;
+}
+function currentBet() { return state.bet === "max" ? Math.min(state.balance, MAX_BET) : state.bet; }
+function refreshBet() { $("#betShown").textContent = money(Math.max(0, currentBet())); }
+
+/* ---------- tabs, chips, picks ---------- */
+$$(".tabs button").forEach(b => b.onclick = () => {
+  if (state.busy) return; tap();
+  state.game = b.dataset.game;
+  $$(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  $$(".game").forEach(g => g.classList.toggle("on", g.id === "g-" + state.game));
+  $("#play").textContent = { slots: "Spin", vault: "Spin", coin: "Flip", roulette: "Spin the wheel" }[state.game];
+  say("Choose a bet and play.");
+});
+$$("#chips button").forEach(b => b.onclick = () => {
+  if (state.busy) return; tap();
+  state.bet = b.dataset.b === "max" ? "max" : +b.dataset.b;
+  $$("#chips button").forEach(x => x.setAttribute("aria-pressed", x === b)); refreshBet();
+});
+$$(".choices").forEach(c => c.querySelectorAll("button").forEach(b => b.onclick = () => {
+  if (state.busy) return; tap();
+  state.pick[c.dataset.pick] = b.dataset.v;
+  c.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+}));
+
+/* ---------- animations ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, state.fast ? ms * 0.4 : ms));
+const FLICK = { slots: ["🍒","🍋","🔔","💎","7️⃣"], vault: ["crown","gem","bolt","star","shield"] }, VKEYS = FLICK.vault;
+function paint(r, k) {
+  if (VKEYS.includes(k)) r.innerHTML = `<svg viewBox="0 0 64 64"><use href="#s-${k}"/></svg>`; else r.textContent = k;
+}
+async function animReels(g, final) {
+  const syms = FLICK[g], reels = $$(`#g-${g} .reel`);
+  reels.forEach(r => r.classList.add("spin"));
+  const timer = setInterval(() => reels.forEach(r => { if (r.classList.contains("spin")) paint(r, syms[rnd(syms.length)]); }), 80);
+  for (let i = 0; i < 3; i++) { await sleep(700 + i * 450); reels[i].classList.remove("spin"); paint(reels[i], final[i]); tap(); }
+  clearInterval(timer);
+}
+async function animCoin(result) {
+  const c = $("#coin"); const turns = 5 + rnd(3);
+  c.style.transform = `rotateY(${turns * 360 + (result === "tails" ? 180 : 0)}deg)`;
+  await sleep(1300);
+  c.style.transition = "none"; c.style.transform = `rotateY(${result === "tails" ? 180 : 0}deg)`;
+  void c.offsetWidth; c.style.transition = "";
+}
+async function animBall(res) {
+  const b = $("#ball"); b.className = "ball";
+  for (let i = 0; i < 18; i++) { b.textContent = rnd(37); await sleep(60 + i * 8); }
+  b.textContent = res.n === 37 ? "00" : res.n; b.className = "ball " + res.color;
+}
+
+/* ---------- play ---------- */
+$("#play").onclick = async () => {
+  if (state.busy || !state.ready) return;
+  const bet = currentBet();
+  if (bet < MIN_BET || bet > state.balance) { say("Not enough balance. Make a deposit.", "lose"); haptic("error"); return; }
+  state.busy = true; $("#play").disabled = true; say("…");
+  try {
+    const g = state.game;
+    const res = await api("/api/play", { game: g, bet, pick: state.pick[g] });
+    if (g === "slots" || g === "vault") await animReels(g, res.result);
+    else if (g === "coin") await animCoin(res.result);
+    else await animBall(res.result);
+    const net = res.payout - bet;
+    state.balance = res.balance; setBalance(res.balance);
+    if (res.payout > 0) { say(`You won ${money(res.payout)}`, "win"); haptic("success"); }
+    else { say(`You lost ${money(bet)}`, "lose"); haptic("error"); }
+    addHistory(net > 0, signed(net), g);
+    if (state.bet === "max") refreshBet();
+  } catch (e) {
+    say(errText(e), "lose"); haptic("error");
+    if (e.message === "unauthorized") showGate(ERR.unauthorized, false);
+    else loadMe().catch(() => {}); // resync balance after any failure
+  }
+  state.busy = false; $("#play").disabled = false;
+};
+
+/* ---------- navigation ---------- */
+function show(v) {
+  if (state.busy) return; tap();
+  $$(".view").forEach(x => x.classList.toggle("on", x.id === "v-" + v));
+  $$(".bar button").forEach(b => b.setAttribute("aria-current", b.dataset.view === v ? "page" : "false"));
+  window.scrollTo(0, 0);
+}
+$$(".bar button").forEach(b => b.onclick = () => show(b.dataset.view));
+$$(".tile").forEach(t => t.onclick = () => { show("play"); document.querySelector(`.tabs [data-game=${t.dataset.go}]`).click(); });
+/* ---------- wallet: deposit + withdraw (USDT on TRC20 / BEP20 / ERC20) ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const netInfo = id => (state.config && state.config.networks.find(n => n.id === id)) || null;
+const netLabel = id => (netInfo(id) || {}).label || "";
+const netFee = id => (netInfo(id) || {}).fee_usd || 0;
+const ADDR = { trc20: /^T[1-9A-HJ-NP-Za-km-z]{33}$/, bep20: /^0x[a-fA-F0-9]{40}$/, erc20: /^0x[a-fA-F0-9]{40}$/ };
+state.depNet = null; state.wdNet = null; state.pay = null; state.deps = [];
+
+function renderNets() {
+  [["#depNets", "depNet"], ["#wdNets", "wdNet"]].forEach(([el, key]) => {
+    $(el).innerHTML = state.config.networks.map(n => `<button class="net" data-net="${n.id}" aria-pressed="${state[key] === n.id}">${esc(n.label)}</button>`).join("");
+    $(el).querySelectorAll("button").forEach(b => b.onclick = () => { tap(); state[key] = b.dataset.net; renderNets(); updateWd(); });
+  });
+}
+function applyConfig() {
+  const { deposit: d, withdraw: w } = state.config;
+  renderNets();
+  $("#depNote").textContent = `Min $${d.min}, max $${d.max} per deposit. You get a dedicated address and the exact amount to send. Your balance updates after the network confirms the payment.`;
+  $("#wdNote").textContent = `Min $${w.min}, max $${w.max}. Withdrawals are reviewed by our team and sent manually, usually ${w.eta}. Double-check your address: crypto transfers can't be undone.`;
+  updateWd();
+}
+$$("[data-wtab]").forEach(b => b.onclick = () => {
+  tap(); $$("[data-wtab]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  $("#w-dep").hidden = b.dataset.wtab !== "dep"; $("#w-wd").hidden = b.dataset.wtab !== "wd";
+});
+$$(".qa button").forEach(b => b.onclick = () => { tap(); $("#amt").value = b.dataset.q; });
+
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch { const a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) {} a.remove(); }
+  toast("Copied"); tap();
+}
+function showPay(d) {
+  state.pay = d; const label = netLabel(d.network) || "USDT";
+  const box = $("#payBox"); box.hidden = false;
+  box.innerHTML = `<b>Send exactly</b><div class="big">${esc(d.pay_amount)} USDT</div><div>${esc(label)}</div>
+    <b>to this address</b><div class="addr">${esc(d.pay_address)}</div>
+    <div class="btns"><button class="bonus" data-copy="${esc(d.pay_address)}">Copy address</button><button class="bonus" data-copy="${esc(d.pay_amount)}">Copy amount</button></div>
+    <p class="note warn">Send only USDT on the ${esc(label)} network. Other networks or a different amount can be lost or delayed.</p>
+    <p class="note" id="payStatus">Status: ${esc(DEP_LABEL[d.status] || "Awaiting payment")}</p>`;
+}
+$("#payBox").onclick = e => { const b = e.target.closest("[data-copy]"); if (b) copyText(b.dataset.copy); };
+$("#depList").onclick = e => {
+  const b = e.target.closest("[data-pay]"); if (!b) return;
+  const d = state.deps.find(x => x.order_id === b.dataset.pay); if (d) { showPay(d); $("#payBox").scrollIntoView({ behavior: "smooth", block: "center" }); }
+};
+
+let pollTimer;
+function watchDeposit(before) { // poll while the user pays; the webhook credits the balance server-side
+  clearInterval(pollTimer); let n = 0;
+  pollTimer = setInterval(async () => {
+    if (++n > 120) return clearInterval(pollTimer);
+    try {
+      const d = await loadMe();
+      if (d.balance > before) { clearInterval(pollTimer); toast(`Deposit received: +${money(d.balance - before)}`); haptic("success"); }
+    } catch (e) {}
+  }, 10000);
+}
+async function startDeposit() {
+  if (state.depositing || state.busy || !state.ready) return;
+  if (!state.depNet) return toast("Choose a network first.");
+  const amount = parseFloat($("#amt").value), { min, max } = state.config.deposit;
+  if (!(amount >= min && amount <= max)) return toast(`Enter an amount between $${min} and $${max}.`);
+  state.depositing = true; $("#amtGo").disabled = true;
+  try {
+    const before = state.balance;
+    const d = await api("/api/deposit", { usd: Math.round(amount * 100) / 100, network: state.depNet });
+    showPay({ ...d, status: "waiting" }); $("#payBox").scrollIntoView({ behavior: "smooth", block: "center" });
+    watchDeposit(before); loadMe().catch(() => {});
+  } catch (e) { toast(errText(e)); }
+  state.depositing = false; $("#amtGo").disabled = false;
+}
+$("#amtGo").onclick = startDeposit;
+
+function updateWd() {
+  const s = $("#wdSummary"), amt = parseFloat($("#wdAmt").value);
+  if (!state.wdNet) { s.textContent = "Choose a network to see the fee."; return; }
+  const f = netFee(state.wdNet);
+  s.textContent = !(amt > 0) ? `Network fee: $${f.toFixed(2)}, taken from the amount.`
+    : amt > f ? `Fee $${f.toFixed(2)} · you receive $${(amt - f).toFixed(2)} USDT` : `Amount must be higher than the $${f.toFixed(2)} fee.`;
+}
+$("#wdAmt").oninput = updateWd;
+$("#wdMax").onclick = () => { tap(); $("#wdAmt").value = (Math.min(state.balance, state.config.withdraw.max * 100) / 100).toFixed(2); updateWd(); };
+const confirmDialog = msg => new Promise(res => { if (tg && tg.showConfirm) tg.showConfirm(msg, ok => res(!!ok)); else res(confirm(msg)); });
+async function submitWithdraw() {
+  if (state.withdrawing || state.busy || !state.ready) return;
+  const { min, max, eta } = state.config.withdraw;
+  const amount = parseFloat($("#wdAmt").value), address = $("#wdAddr").value.trim();
+  if (!state.wdNet) return toast("Choose a network first.");
+  if (!ADDR[state.wdNet].test(address)) return toast(ERR.bad_address);
+  if (!(amount >= min && amount <= max)) return toast(`Withdrawals are between $${min} and $${max}.`);
+  if (Math.round(amount * 100) > state.balance) return toast(ERR.insufficient_balance);
+  const fee = netFee(state.wdNet);
+  if (amount <= fee) return toast(`Amount must be higher than the $${fee.toFixed(2)} fee.`);
+  if (!(await confirmDialog(`Withdraw $${amount.toFixed(2)}? You receive $${(amount - fee).toFixed(2)} USDT (${netLabel(state.wdNet)}) to ${address}. Transfers can't be reversed.`))) return;
+  state.withdrawing = true; $("#wdGo").disabled = true;
+  try {
+    const r = await api("/api/withdraw", { usd: Math.round(amount * 100) / 100, network: state.wdNet, address });
+    state.balance = r.balance; setBalance(r.balance); refreshBet();
+    $("#wdAmt").value = ""; updateWd(); haptic("success");
+    toast(`Withdrawal requested. It will be reviewed and sent ${eta}.`);
+    loadMe().catch(() => {});
+  } catch (e) { toast(errText(e)); haptic("error"); }
+  state.withdrawing = false; $("#wdGo").disabled = false;
+}
+$("#wdGo").onclick = submitWithdraw;
+document.addEventListener("visibilitychange", () => { if (!document.hidden && state.ready) loadMe().catch(() => {}); });
+
+$$(".sw").forEach(w => w.onclick = () => {
+  const on = w.getAttribute("aria-checked") !== "true"; w.setAttribute("aria-checked", on);
+  state[w.id === "swHaptic" ? "haptics" : "fast"] = on; tap();
+});
+
+/* ---------- init ---------- */
+$("#gateBtn").onclick = () => location.reload();
+(async function init() {
+  if (!tg || !tg.initData) return showGate("Open this app from Telegram to play.", false);
+  const u = tg.initDataUnsafe && tg.initDataUnsafe.user; // display only, never trusted for auth
+  if (u) $("#name").textContent = u.first_name || "Player";
+  try {
+    state.config = await api("/api/config"); applyConfig();
+    await loadMe(); state.ready = true; $("#gate").classList.remove("on");
+  } catch (e) { showGate(e.message === "unauthorized" ? ERR.unauthorized : e.message === "rate_limited" ? ERR.rate_limited : "Can't reach the server. Check your connection.", e.message !== "unauthorized"); }
+})();
+</script>
+</body>
+</html>
